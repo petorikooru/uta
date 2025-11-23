@@ -5,3 +5,4 @@ Yet another portable music player based on ESP32-S3
 - TFT_eSPI
 - SdFAT
 - arduino_audio_tools
+- FLACFoxen (from arduino_audio_tools)
