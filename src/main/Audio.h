@@ -69,14 +69,14 @@ void getVorbisData(FsFile& file, uint32_t size) {
     // Check for TITLE=
     if (entry.startsWith("TITLE=")) {
       currentTrack.title = entry.substring(6);
-      Serial.print("[METADATA] Title: ");
-      Serial.println(currentTrack.title);
+      Serial.print("- Title: ");
+      Serial.print(currentTrack.title);
     }
 
     // Check for ARTIST=
     if (entry.startsWith("ARTIST=")) {
       currentTrack.artist = entry.substring(7);
-      Serial.print("[METADATA] Artist: ");
+      Serial.print("\t\t- Artist: ");
       Serial.println(currentTrack.artist);
     }
   }

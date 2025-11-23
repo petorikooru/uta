@@ -34,17 +34,19 @@ void setup() {
   Serial.println(VAR_NAME(StaticBg));
   display_png(StaticBg, sizeof(StaticBg));
 
-  Serial.print("Currently in directory: ");
+  Serial.println("\n\n[================= Current Directory =================]");
   Serial.println(path);
   sd.ls(path, LS_SIZE);
 
-  Serial.println("================================");
+  Serial.println("\n\n[================== Root Directory ===================]");
   Serial.println(root);
   sd.ls(root, LS_SIZE);
   if (!player.begin()) {
     Serial.println("Failed to start player");
     stop();
   }
+
+  Serial.println("\n\n[================== Player Status ====================]");
   player.next();player.next();player.next();
 }
 
