@@ -4,31 +4,25 @@
 #include "uta_Audio.h"
 #include "uta_Display.h"
 #include "uta_SDCard.h"
+
+#include "music.h"
 #include "StaticBg.h"
 
 DisplayManager display;
 AudioManager audio;
 
-constexpr const char* MUSIC_ROOT = "/Music/Aitsuki Nakuru/";
+uint8_t current_dir_index   = 0;
+String  current_directory   = DIRECTORIES[current_dir_index];
+float   current_volume      = 0.2f;
+uint8_t current_brightness  = 50;
 
-const String DIRECTORIES[] = {
-    // ... your folders here
-};
-
-uint8_t current_dir_index = 5;
-String current_directory = DIRECTORIES[current_dir_index];
-float current_volume = 0.2f;
-
-constexpr int BUFFER_SIZE = 1024;
-constexpr unsigned long PROGRESS_UPDATE_INTERVAL_MS = 1000;
+constexpr uint16_t PROGRESS_UPDATE_INTERVAL_MS = 1000;
 
 FsFile dir;
 NamePrinter name_printer(audio.source);
 
-unsigned long last_progress_update_ms = 0;
-float last_reported_time_s = -1.0f;
-
-// ======================== Helper Functions ========================
+uint16_t    last_progress_update_ms = 0;
+float       last_reported_time_s = -1.0f;
 
 const char* flash_mode_to_string(uint8_t mode) {
     switch (mode) {
@@ -46,7 +40,6 @@ void draw_bar(const char* label, uint32_t used, uint32_t total, const char* unit
     int percent = (used * 100) / total;
     int filled = (percent * 40) / 100;
 
-    // Align label
     Serial.printf(" %s%*s: ", label, 12 - (int)strlen(label), "");
     Serial.printf("%6lu / %6lu %s  (%3d%%) [", used, total, unit, percent);
 
@@ -74,10 +67,9 @@ void draw_simple_bar(const char* label, int percent) {
 void show_resource_monitor() {
     Serial.println();
     Serial.println(F("╔══════════════════════════════════════════════════════════════╗"));
-    Serial.println(F("║              ESP32-S3 Resource Monitor • BAR VIEW           ║"));
+    Serial.println(F("║                              :3                              ║"));
     Serial.println(F("╚══════════════════════════════════════════════════════════════╝\n"));
 
-    // System Info
     Serial.printf(" Chip      : %s Rev %d | Cores: 2 | Freq: %d MHz\n",
                   ESP.getChipModel(), ESP.getChipRevision(), ESP.getCpuFreqMHz());
     Serial.printf(" Flash     : %d MB %s", ESP.getFlashChipSize() / 1024 / 1024,
@@ -96,7 +88,6 @@ void show_resource_monitor() {
     draw_bar("SKETCH", ESP.getSketchSize(), ESP.getSketchSize() + ESP.getFreeSketchSpace());
     Serial.println(F("╚══════════════════════════════════════════════════════════════╝\n"));
 
-    // CPU Load (approximated via idle task stack)
     Serial.println(F("╔══════════════════════════ CPU LOAD ══════════════════════════╗"));
     for (int core = 0; core < 2; ++core) {
         TaskHandle_t idle_task = xTaskGetIdleTaskHandleForCPU(core);
@@ -143,19 +134,19 @@ void show_resource_monitor() {
 void show_help_menu() {
     Serial.println();
     Serial.println(F("╔══════════════════════════════════════════════════════════════╗"));
-    Serial.println(F("║               ESP32-S3 Music Player Dashboard                ║"));
+    Serial.println(F("║                              :3                              ║"));
     Serial.println(F("╚══════════════════════════════════════════════════════════════╝\n"));
     Serial.println(F("  Directory Control"));
     Serial.println(F("   [r]  Next Folder      →"));
     Serial.printf("     Current: %s\n", current_directory.c_str());
     Serial.println(F("   [R]  Previous Folder"));
     Serial.println(F("   [v]  View Current Queue"));
-    Serial.println(F("   [V]  View Root (/Music/Aitsuki Nakuru)"));
+    Serial.printf((  "   [V]  View Root (%s)\n"), ROOT);
     Serial.println();
     Serial.println(F("  Audio Control"));
     Serial.println(F("   [n]  Next Track        [p]  Previous Track"));
     Serial.println(F("   [s]  Play / Stop       [+]  Volume Up    [-]  Volume Down"));
-    Serial.printf("   Volume: %d%%\n", (int)(current_volume * 100));
+    Serial.printf(   "   Volume: %d%%\n", (int)(current_volume * 100));
     Serial.println();
     Serial.println(F("  System"));
     Serial.println(F("   [e]  Resource Monitor"));
@@ -167,11 +158,8 @@ void show_help_menu() {
     Serial.println(F("╚══════════════════════════════════════════════════════════════╝\n"));
 }
 
-// ======================== Directory Management ========================
-
 void load_directory(const String& path) {
     audio.player.stop();
-    audio.player.setIndex(0);
     Serial.printf("[INFO] Loading directory: %s\n", path.c_str());
     current_directory = path;
 
@@ -185,7 +173,8 @@ void load_directory(const String& path) {
     }
 
     name_printer.setPrefix(path.c_str());
-    dir.ls(&name_printer, O_RDONLY);
+    dir.ls(&name_printer, LS_R);
+    Serial.println(dir.curPosition());
     dir.close();
 }
 
@@ -201,8 +190,7 @@ void change_to_next_directory() {
     sd.ls(current_directory.c_str(), LS_R | LS_SIZE);
 
     if (!audio.player.begin()) {
-        Serial.println(F("Failed to initialize player → skipping to next folder"));
-        change_to_next_directory();  // Recursive skip on failure
+        Serial.println(F("Failed to initialize player → please skip to next folder"));
     }
 }
 
@@ -219,6 +207,10 @@ void change_to_previous_directory() {
     Serial.println(F( "╚════════════════════════════════════════════════════╝"));
 
     sd.ls(current_directory.c_str(), LS_R | LS_SIZE);
+
+    if (!audio.player.begin()) {
+        Serial.println(F("Failed to initialize player → please skip to next folder"));
+    }
 }
 
 // ======================== Input Handlers ========================
@@ -238,7 +230,7 @@ void handle_directory_command(char cmd) {
         case 'V':
             Serial.println();
             Serial.println(F("╔═══════════════════ ROOT DIRECTORY ═════════════════╗"));
-            sd.ls(MUSIC_ROOT, LS_SIZE);
+            sd.ls(ROOT, LS_SIZE);
             Serial.println(F("╚════════════════════════════════════════════════════╝"));
             break;
         case 'e': show_resource_monitor(); break;
@@ -249,6 +241,13 @@ void handle_directory_command(char cmd) {
             Serial.println(F("║             Restarting ESP32 in 1...               ║")); delay(1000);
             ESP.restart();
             break;
+        case 'X': 
+            Serial.println(F("╔════════════════════ SYSTEM ════════════════════════╗"));
+            Serial.println(F("║             Shutting Down ESP32 in 3...            ║")); delay(1000);
+            Serial.println(F("║             Shutting Down ESP32 in 2...            ║")); delay(1000);
+            Serial.println(F("║             Shutting Down ESP32 in 1...            ║")); delay(1000);
+            esp_deep_sleep_start(); 
+            break;
         case 'h': case 'H': case '?':
             show_help_menu();
             break;
@@ -257,13 +256,13 @@ void handle_directory_command(char cmd) {
 
 void handle_audio_command(char cmd) {
     switch (cmd) {
-        case 'n':
+        case '>':
             audio.player.next();
             Serial.println(F( "╔══════════════════ TRACK ══════════════════╗\n"
                               "║               ▶▶ Next Track               ║\n"
                               "╚═══════════════════════════════════════════╝"));
             break;
-        case 'p':
+        case '<':
             audio.player.previous();
             Serial.println(F( "╔══════════════════ TRACK ══════════════════╗\n"
                               "║            ◀◀ Previous Track              ║\n"
@@ -286,14 +285,27 @@ void handle_audio_command(char cmd) {
             current_volume = min(1.0f, current_volume + 0.05f);
             audio.player.setVolume(current_volume);
             display.show_volume((int)(current_volume * 100));
-            Serial.printf("\033[1m Volume Up → %d%%\033[0m\n", (int)(current_volume * 100));
+            Serial.printf("Volume Up → %d%%\n", (int)(current_volume * 100));
             break;
         case '-':
             current_volume = max(0.0f, current_volume - 0.05f);
             audio.player.setVolume(current_volume);
             display.show_volume((int)(current_volume * 100));
-            Serial.printf("\033[1m Volume Down → %d%%\033[0m\n", (int)(current_volume * 100));
+            Serial.printf("Volume Down → %d%%\n", (int)(current_volume * 100));
             break;
+    }
+}
+
+void handle_display_command(char cmd){
+    switch(cmd){
+        case '(':
+            current_brightness = max(0, current_brightness - 10);
+            TFT_SET_BL(current_brightness);
+            break;
+        case ')':
+            current_brightness = min(100, current_brightness + 10);
+            TFT_SET_BL(current_brightness);
+            break; 
     }
 }
 
@@ -311,6 +323,7 @@ void setup() {
 
     Serial.println(F("╚════════════════════════════════════════════════════╝"));
     display.display_png(StaticBg, sizeof(StaticBg));
+    TFT_SET_BL(current_brightness);
 
     show_resource_monitor();
     show_help_menu();
@@ -319,27 +332,28 @@ void setup() {
         Serial.println("Failed to start player");
         while(1);
     }
+    audio.player.setVolume(current_volume);
     audio.player.setAutoNext(true);
+
 }
 
 void loop() {
     audio.player.copy();
 
-    if (Serial.available()) {
-        char cmd = Serial.read();
-        handle_audio_command(cmd);
-        handle_directory_command(cmd);
-    }
+    char cmd = Serial.read();
+    handle_audio_command(cmd);
+    handle_directory_command(cmd);
+    handle_display_command(cmd);
 
     // Progress bar update
     unsigned long now = millis();
-    float current_time = audio.getAudioCurrentTime();
+    float current_time = audio.get_current_time();
 
     if (audio.player.isActive() &&
         (now - last_progress_update_ms >= PROGRESS_UPDATE_INTERVAL_MS ||
          fabsf(current_time - last_reported_time_s) >= 1.0f)) {
 
-        display.update_progress(current_time, audio.getAudioFileDuration());
+        display.update_progress(current_time, audio.get_audio_duration());
         last_progress_update_ms = now;
         last_reported_time_s = current_time;
     }

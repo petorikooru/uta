@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "AudioTools.h"
 #include "AudioTools/Disk/AudioSourceSDFAT.h"
 #include "AudioTools/AudioCodecs/CodecFLACFoxen.h"
@@ -41,30 +42,70 @@ const char* getFileStem(const char* path) {
 
 void formatDuration(float seconds, char* buffer, size_t bufSize = 12) {
   if (seconds < 0) seconds = 0;
-  if (bufSize < 9) return;  // Minimum safe size: "00:00:00\0"
+  if (bufSize < 9) return;
 
   uint32_t total = (uint32_t)seconds;
   uint16_t hrs = total / 3600;
-  uint8_t  mins = (total % 3600) / 60;
-  uint8_t  secs = total % 60;
+  uint8_t mins = (total % 3600) / 60;
+  uint8_t secs = total % 60;
 
   if (hrs > 0) {
-    snprintf(buffer, bufSize, "%u:%02u:%02u", hrs, mins, secs);  // e.g. 1:23:45
+    snprintf(buffer, bufSize, "%u:%02u:%02u", hrs, mins, secs);
   } else {
-    snprintf(buffer, bufSize, "%u:%02u", mins, secs);            // e.g. 4:27
+    snprintf(buffer, bufSize, "%u:%02u", mins, secs);
   }
 }
 
 class AudioManager {
-public:
+
+protected:
+
+  class UtaI2S : public I2SStream {
+  public:
+    uint64_t bytes_written = 0;
+
+    size_t write(const uint8_t* buffer, size_t size) override {
+      size_t res      = I2SStream::write(buffer, size);
+      bytes_written  += res;
+
+      return res;
+    }
+
+    float getAudioCurrentTime() {
+      auto info = audioInfo();
+      if (info.sample_rate == 0) 
+        return 0.0f;
+      int byte_rate = info.sample_rate * info.channels * (info.bits_per_sample / 8);
+
+      return byte_rate > 0 ? (float)bytes_written / byte_rate : 0.0f;
+    }
+
+    void resetBytesWritten() {
+      bytes_written = 0;
+    }
+  };
+
+  static FsFile audio_file;
+  static FsFile meta_file;
+  static bool played;
+
+  static UtaI2S i2s;
+
+  MultiDecoder      decoder;
+  FLACDecoderFoxen  flac_decoder;
+  MP3DecoderHelix   mp3_decoder;
+  AACDecoderHelix   aac_decoder;
+  WAVDecoder        wav_decoder;
+
+
   static FsFile* file_to_stream(const char* path, FsFile& old_file) {
-    // Reset the previous stuff
+
     if (old_file.isOpen()) {
       old_file.close();
     }
 
     i2s.resetBytesWritten();
-    resetCurrentTime();
+    reset_current_time();
     current_duration = 0.0f;
 
     current_track.artist.clear();
@@ -75,8 +116,7 @@ public:
     String filename = fullPath.substring(fullPath.lastIndexOf('/') + 1);
     filename.toLowerCase();
 
-    // Supported formats
-    const char* supported[] = { ".mp3", ".flac", ".wav", ".aac", ".m4a", ".ogg" };
+    const char* supported[] = { ".mp3", ".flac", ".wav" };
     bool isSupported = false;
     for (const char* ext : supported) {
       if (filename.endsWith(ext)) {
@@ -110,17 +150,16 @@ public:
     bool metadata_ok = false;
 
     if (meta_file.open(path)) {
-      Serial.print(" Extracting metadata...");
-      dispatch_metadata_extraction(meta_file, path);
+      extract_metadata(meta_file, path);
       meta_file.close();
     } else {
       Serial.println(" Failed to open file for metadata");
     }
 
     // Fallback: use filename if no title
-    if (current_track.title.isEmpty())  current_track.title     = getFileStem(path);
-    if (current_track.artist.isEmpty()) current_track.artist    = "Unknown Artist";
-    if (current_track.album.isEmpty())  current_track.album     = "Unknown Album";
+    if (current_track.title.isEmpty())  current_track.title   = getFileStem(path);
+    if (current_track.artist.isEmpty()) current_track.artist  = "Unknown Artist";
+    if (current_track.album.isEmpty())  current_track.album   = "Unknown Album";
 
     Serial.println(F("──────────────────────────────────────────────────────────────"));
     Serial.printf(" Title  : %s\n", current_track.title.c_str());
@@ -134,7 +173,7 @@ public:
     if (!audio_file.open(path)) {
       Serial.println();
       Serial.println(F(" ERROR: Cannot open audio file!"));
-      Serial.println(F("        File may be corrupted or SD card issue."));
+      Serial.println(F("        File may be unsupported."));
       Serial.println(F("══════════════════════════════════════════════════════════════\n"));
 
       // Trick the player to automatically skip stuff
@@ -142,57 +181,15 @@ public:
       return &audio_file;
     }
 
-    Serial.print(" Playing audio...");
-    Serial.println(" Ready");
 
-    if      (filename.endsWith(".flac"))    Serial.println(" Format: FLAC (Lossless)");
-    else if (filename.endsWith(".mp3"))     Serial.println(" Format: MP3");
-    else if (filename.endsWith(".wav"))     Serial.println(" Format: WAV (Uncompressed)");
-    else if (filename.endsWith(".m4a") ||   filename.endsWith(".aac")) Serial.println(" Format: AAC");
-    else if (filename.endsWith(".ogg"))     Serial.println(" Format: OGG Vorbis");
+    if      (filename.endsWith(".flac"))  Serial.println(" Format: FLAC (Lossless)");
+    else if (filename.endsWith(".mp3"))   Serial.println(" Format: MP3");
+    else if (filename.endsWith(".wav"))   Serial.println(" Format: WAV (Uncompressed)");
 
     Serial.println(F("══════════════════════════════════════════════════════════════\n"));
 
     return &audio_file;
   }
-
-private:
-  static FsFile audio_file;
-  static FsFile meta_file;
-  static bool played;
-
-  class MyI2SStream : public I2SStream {
-  public:
-    uint64_t bytes_written = 0;
-
-    size_t write(const uint8_t* buffer, size_t size) override {
-      size_t res = I2SStream::write(buffer, size);
-      bytes_written += res;
-      return res;
-    }
-
-    float getAudioCurrentTime() {
-      auto info = audioInfo();
-      if (info.sample_rate == 0) return 0.0f;
-      int byte_rate = info.sample_rate * info.channels * (info.bits_per_sample / 8);
-      return byte_rate > 0 ? (float)bytes_written / byte_rate : 0.0f;
-    }
-
-    void resetBytesWritten() {
-      bytes_written = 0;
-    }
-  };
-
-  static MyI2SStream i2s;
-
-  MultiDecoder decoder;
-  FLACDecoderFoxen flac_decoder;
-  MP3DecoderHelix mp3_decoder;
-  AACDecoderHelix aac_decoder;
-  WAVDecoder wav_decoder;
-
-  BufferRTOS<uint8_t> buffer;
-  QueueStream<uint8_t> queue;
 
   static void get_vorbis_data(FsFile& file, uint32_t size) {
     uint32_t vendor_len;
@@ -214,9 +211,14 @@ private:
       buf[read_len] = '\0';
 
       String entry = String(buf);
-      if      (entry.startsWith("TITLE="))    current_track.title   = entry.substring(6);
-      else if (entry.startsWith("ARTIST="))   current_track.artist  = entry.substring(7);
-      else if (entry.startsWith("ALBUM="))    current_track.album   = entry.substring(6);
+      if      (entry.startsWith("TITLE=")) current_track.title = entry.substring(6);
+      else if (entry.startsWith("title=")) current_track.title = entry.substring(6);
+
+      if      (entry.startsWith("ARTIST=")) current_track.artist = entry.substring(7);
+      else if (entry.startsWith("artist=")) current_track.artist = entry.substring(7);
+
+      if      (entry.startsWith("ALBUM=")) current_track.album = entry.substring(6);
+      else if (entry.startsWith("album=")) current_track.album = entry.substring(6);
     }
   }
 
@@ -233,22 +235,22 @@ private:
       uint8_t header[4];
       if (file.read(header, 4) != 4) break;
 
-      last_block            = header[0] & 0x80;
-      uint8_t block_type    = header[0] & 0x7F;
-      uint32_t block_size   = (header[1] << 16) | (header[2] << 8) | header[3];
+      last_block = header[0] & 0x80;
+      uint8_t block_type = header[0] & 0x7F;
+      uint32_t block_size = (header[1] << 16) | (header[2] << 8) | header[3];
 
       if (block_type == 0) {
         uint8_t buf[34];
 
         if (file.read(buf, 34) != 34) return false;
-        uint32_t sample_rate    = ((uint32_t)buf[10] << 12) | (buf[11] << 4) | ((buf[12] >> 4) & 0x0F);
-        uint8_t channels        = ((buf[12] & 0x0E) >> 1) + 1;
-        uint8_t bps             = (((buf[12] & 0x01) << 4) | ((buf[13] >> 4) & 0x0F)) + 1;
-        uint64_t total_samples  = ((uint64_t)(buf[13] & 0x0F) << 32) | ((uint64_t)buf[14] << 24) | ((uint64_t)buf[15] << 16) | ((uint64_t)buf[16] << 8) | buf[17];
+        uint32_t sample_rate = ((uint32_t)buf[10] << 12) | (buf[11] << 4) | ((buf[12] >> 4) & 0x0F);
+        uint8_t channels = ((buf[12] & 0x0E) >> 1) + 1;
+        uint8_t bps = (((buf[12] & 0x01) << 4) | ((buf[13] >> 4) & 0x0F)) + 1;
+        uint64_t total_samples = ((uint64_t)(buf[13] & 0x0F) << 32) | ((uint64_t)buf[14] << 24) | ((uint64_t)buf[15] << 16) | ((uint64_t)buf[16] << 8) | buf[17];
 
         current_duration = (float)total_samples / sample_rate;
 
-        static char duration_str[12] = {0};
+        static char duration_str[12] = { 0 };
         formatDuration(current_duration, duration_str, 12);
         Serial.printf("\n Duration: [%s]\n", duration_str);
 
@@ -297,7 +299,12 @@ private:
         int sr_idx = (buf[i + 2] & 0x0C) >> 2;
         int br_idx = (buf[i + 2] & 0xF0) >> 4;
 
-        static const int sr_table[3][3] = { { 44100, 48000, 32000 }, { 22050, 24000, 16000 }, { 11025, 12000, 8000 } };
+        static const int sr_table[3][3] = { 
+          { 44100, 48000, 32000 }, 
+          { 22050, 24000, 16000 }, 
+          { 11025, 12000, 8000 } 
+        };
+
         static const int br_table[2][15] = {
           { 0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448 },
           { 0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256 }
@@ -315,6 +322,7 @@ private:
     }
   }
 
+  // Idk what does it do exactly, but basically just extract metadata
   static bool get_mp3_metadata(FsFile& file) {
     file.seek(0);
     char header[10];
@@ -342,21 +350,80 @@ private:
       }
 
       char* data = new char[fsize + 1];
-      file.read((uint8_t*)data, fsize);
+      file.read((char*)data, fsize);
       data[fsize] = 0;
 
-      String value;
-      if (data[0] == 0 || data[0] == 3) {
-        value = String(data + 1);
-      } else if (data[0] == 1 && fsize > 2) {
-        value = String(data + 3);
-      } else {
-        value = String(data);
+      uint8_t enc_byte = (uint8_t)data[0];
+      int enc = enc_byte;
+      char* text_start = data + 1;
+      size_t avail_bytes = fsize - 1;
+      bool little_endian = false;
+      if (enc == 1 && avail_bytes >= 2) {
+        uint8_t bom1 = (uint8_t)text_start[0];
+        uint8_t bom2 = (uint8_t)text_start[1];
+        if ((bom1 == 0xFF && bom2 == 0xFE) || (bom1 == 0xFE && bom2 == 0xFF)) {
+          little_endian = (bom2 == 0xFE);
+          text_start += 2;
+          avail_bytes -= 2;
+        }
       }
 
-      if        (strncmp(frame, "TIT2", 4) == 0) current_track.title = value;
-      else if   (strncmp(frame, "TPE1", 4) == 0) current_track.artist = value;
-      else if   (strncmp(frame, "TALB", 4) == 0) current_track.album = value;
+      size_t text_bytes;
+      if (enc == 3) {
+        text_bytes = avail_bytes;
+      } else {
+        int unit_size = (enc == 0) ? 1 : 2;
+        size_t num_units = avail_bytes / unit_size;
+        size_t units_to_term = 0;
+        const uint8_t* p = (const uint8_t*)text_start;
+        if (unit_size == 1) {
+          while (units_to_term < num_units && p[units_to_term] != 0) ++units_to_term;
+        } else {
+          while (units_to_term < num_units && (p[2 * units_to_term] != 0 || p[2 * units_to_term + 1] != 0)) ++units_to_term;
+        }
+        text_bytes = units_to_term * unit_size;
+      }
+
+      String value;
+      if (enc == 3) {
+        value = String(text_start, text_bytes);
+      } else if (enc == 0) {
+        value = "";
+        const uint8_t* p = (const uint8_t*)text_start;
+        for (size_t i = 0; i < text_bytes; ++i) {
+          uint32_t ch = p[i];
+          if (ch == 0) break;
+          if (ch < 128) {
+            value += (char)ch;
+          } else {
+            value += (char)(0xC0 | (ch >> 6));
+            value += (char)(0x80 | (ch & 0x3F));
+          }
+        }
+      } else {  // UTF-16 (enc 1 or 2)
+        value = "";
+        const uint8_t* p = (const uint8_t*)text_start;
+        for (size_t i = 0; i < text_bytes / 2; ++i) {
+          uint8_t b1 = p[2 * i];
+          uint8_t b2 = p[2 * i + 1];
+          uint16_t ch = little_endian ? (b2 << 8 | b1) : (b1 << 8 | b2);
+          if (ch == 0) break;
+          if (ch < 0x80) {
+            value += (char)ch;
+          } else if (ch < 0x800) {
+            value += (char)(0xC0 | (ch >> 6));
+            value += (char)(0x80 | (ch & 0x3F));
+          } else {
+            value += (char)(0xE0 | (ch >> 12));
+            value += (char)(0x80 | ((ch >> 6) & 0x3F));
+            value += (char)(0x80 | (ch & 0x3F));
+          }
+        }
+      }
+
+      if      (strncmp(frame, "TIT2", 4) == 0) current_track.title  = value;
+      else if (strncmp(frame, "TPE1", 4) == 0) current_track.artist = value;
+      else if (strncmp(frame, "TALB", 4) == 0) current_track.album  = value;
 
       delete[] data;
       pos += 10 + fsize;
@@ -364,8 +431,6 @@ private:
     }
 
     estimate_mp3_duration(file);
-    if (!current_track.title.isEmpty())
-      Serial.printf("- [ID3v2] %s - %s\n", current_track.artist.c_str(), current_track.title.c_str());
     return true;
   }
 
@@ -416,9 +481,9 @@ private:
             String val = buf;
             delete[] buf;
 
-            if      (strncmp(id, "INAM", 4) == 0) current_track.title   = val;
-            else if (strncmp(id, "IART", 4) == 0) current_track.artist  = val;
-            else if (strncmp(id, "IPRD", 4) == 0) current_track.album   = val;
+            if (strncmp(id, "INAM", 4) == 0) current_track.title = val;
+            else if (strncmp(id, "IART", 4) == 0) current_track.artist = val;
+            else if (strncmp(id, "IPRD", 4) == 0) current_track.album = val;
 
             if (len % 2) file.seek(file.position() + 1);
           }
@@ -430,18 +495,8 @@ private:
     return true;
   }
 
-  static bool get_aac_metadata(FsFile& file) {
-    file.seek(0);
-    char buf[12];
-    if (file.read(buf, 12) == 12 && strncmp(buf + 4, "ftyp", 4) == 0) {
-      Serial.println("[INFO] .m4a file detected (MP4 container) — metadata not parsed");
-      return false;
-    }
-    Serial.println("[INFO] Raw AAC — no metadata");
-    return false;
-  }
 
-  static void dispatch_metadata_extraction(FsFile& file, const char* path) {
+  static void extract_metadata(FsFile& file, const char* path) {
     String ext = String(path);
     ext.toLowerCase();
     ext = ext.substring(ext.lastIndexOf('.') + 1);
@@ -454,10 +509,9 @@ private:
       }
     } else if (ext == "wav") {
       get_wav_metadata(file);
-    } else if (ext == "aac" || ext == "m4a") {
-      get_aac_metadata(file);
     }
   }
+
   static inline size_t min(size_t x, size_t y) {
     return (x < y) ? x : y;
   }
@@ -475,52 +529,50 @@ public:
   static float current_duration;
 
   AudioSourceVector<FsFile> source;
-  AudioPlayer player;
+  AudioPlayer               player;
 
   AudioManager()
-    : buffer(8192, 512), queue(buffer), source(&AudioManager::file_to_stream), player(source, i2s, decoder) {}
+    : source(&AudioManager::file_to_stream)
+    , player(source, i2s, decoder) {}
 
   bool begin() {
+    AudioLogger::instance().begin(Serial, AudioLogger::Warning);
+
     auto config = i2s.defaultConfig(TX_MODE);
-    config.pin_bck = 8;
-    config.pin_ws = 17;
-    config.pin_data = 18;
-    config.sample_rate = 44100;
-    config.channels = 2;
-    config.bits_per_sample = 16;
+    config.pin_bck          = 8;
+    config.pin_ws           = 17;
+    config.pin_data         = 18;
+
+    player.setBufferSize(8192*4);
 
     decoder.addDecoder(mp3_decoder, "audio/mpeg");
     decoder.addDecoder(aac_decoder, "audio/aac");
     decoder.addDecoder(wav_decoder, "audio/wav");
     decoder.addDecoder(flac_decoder, "audio/flac");
 
+
     if (!i2s.begin(config)) {
       Serial.println("[ERROR] I2S failed");
       return false;
     }
 
-    player.setStream(&queue);
-    queue.begin();
-
-    Serial.println("AudioManager ready: FLAC, MP3, WAV, AAC");
     return true;
   }
 
-  static void resetCurrentTime() {
+  static void reset_current_time() {
     i2s.resetBytesWritten();
   }
-  float getAudioCurrentTime() {
+  float get_current_time() {
     return i2s.getAudioCurrentTime();
   }
-  float getAudioFileDuration() {
+  float get_audio_duration() {
     return current_duration;
   }
 };
 
-// Static member definitions
-AudioManager::Metadata AudioManager::current_track;
-AudioManager::MyI2SStream AudioManager::i2s;
-FsFile AudioManager::audio_file;
-FsFile AudioManager::meta_file;
-bool AudioManager::played = false;
-float AudioManager::current_duration = 0.0f;
+AudioManager::Metadata    AudioManager::current_track;
+AudioManager::UtaI2S      AudioManager::i2s;
+FsFile                    AudioManager::audio_file;
+FsFile                    AudioManager::meta_file;
+bool                      AudioManager::played = false;
+float                     AudioManager::current_duration = 0.0f;

@@ -24,6 +24,16 @@
 
 #define MAX_TEXT_LEN 128
 
+#define TFT_BL 3
+
+void TFT_SET_BL(uint8_t Value) {
+  if (Value < 0 || Value > 100) {
+    printf("TFT_SET_BL Error \r\n");
+  } else {
+    analogWrite(TFT_BL, Value * 2.55);
+  }
+}
+
 class DisplayManager {
 public:
   DisplayManager() : tft(TFT_eSPI()) {}
@@ -32,6 +42,7 @@ public:
     tft.init();
     tft.setRotation(0);
     tft.setAttribute(UTF8_SWITCH, true);
+    tft.setAttribute(PSRAM_ENABLE, false);
 
     tft_mutex = xSemaphoreCreateMutex();
     if (!tft_mutex) {
@@ -189,7 +200,7 @@ private:
           case CMD_VOLUME:   dm->handle_volume(cmd.volume); break;
         }
       }
-      vTaskDelay(1);  // Always yield to audio
+      vTaskDelay(1);
     }
 
     spr.deleteSprite();
@@ -213,13 +224,13 @@ void handle_text(TFT_eSprite* spr, const char* text, uint8_t x, uint8_t y) {
       spr->drawString(text, MAX_IMAGE_WIDTH / 2, 20);
       spr->pushSprite(0, y);
       
-      if (field_idx >= 0) scroll_fields[field_idx].active = false;
+      if (field_idx >= 0) 
+        scroll_fields[field_idx].active = false;
+
     } else {
       spr->fillSprite(TFT_BLACK);
       spr->setTextDatum(TL_DATUM);
       spr->setTextColor(TFT_WHITE);
-      spr->drawString(text, MAX_IMAGE_WIDTH, (40 - spr->fontHeight()) / 2);
-      spr->pushSprite( MAX_IMAGE_WIDTH, y);  // Start fully off right
 
       // Setup scrolling field
       auto& f = scroll_fields[field_idx];
@@ -228,13 +239,12 @@ void handle_text(TFT_eSprite* spr, const char* text, uint8_t x, uint8_t y) {
       f.x = 0;
       f.y = y;
       f.width = tw;
-      f.offset = MAX_IMAGE_WIDTH;           // Start off-screen right
+      f.offset = MAX_IMAGE_WIDTH;
       f.active = true;
       f.pause_until = 0;
+      start_smooth_scroller();
     }
     xSemaphoreGive(tft_mutex);
-
-    start_smooth_scroller();
   }
 
   void start_smooth_scroller() {
@@ -243,47 +253,53 @@ void handle_text(TFT_eSprite* spr, const char* text, uint8_t x, uint8_t y) {
     xTaskCreatePinnedToCore([](void* p) {
       ((DisplayManager*)p)->smooth_scroll_loop();
       vTaskDelete(nullptr);
-    }, "SmoothScroll", 7168, this, 0, &smooth_scroll_task_handle, 0);
+    }, "SmoothScroll", 7168, this, 0, &smooth_scroll_task_handle, 1);
   }
 
   void smooth_scroll_loop() {
     TFT_eSprite spr(&tft);
-    spr.setColorDepth(16);
+    if (!spr.createSprite(MAX_IMAGE_WIDTH + 120, 40-2)) {
+      return;
+    }
     spr.loadFont(FONT);
-    spr.createSprite(MAX_IMAGE_WIDTH + 120, 40);
+    spr.setColorDepth(8);  // Move up for safety
+    spr.setTextWrap(false, true);
+
+    int y_center = (40 - spr.fontHeight()) / 2;
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(TFT_WHITE);
 
     while (true) {
       bool any_active = false;
+      TickType_t now = xTaskGetTickCount();
 
       xSemaphoreTake(tft_mutex, portMAX_DELAY);
       for (auto& f : scroll_fields) {
-        if (!f.active || xTaskGetTickCount() < f.pause_until) continue;
+        if (!f.active || now < f.pause_until) continue;
         any_active = true;
 
         f.offset--;
         if (f.offset <= -(f.width + 100)) {
           f.offset = MAX_IMAGE_WIDTH;
-          f.pause_until = xTaskGetTickCount() + pdMS_TO_TICKS(1400);
-          continue;
+          f.pause_until = now + pdMS_TO_TICKS(1400);
+          // No continue; draw off-right if desired (invisible)
         }
 
         spr.fillSprite(TFT_BLACK);
-        spr.setTextDatum(TL_DATUM);
-        spr.setTextColor(TFT_WHITE);
-        spr.drawString(f.text, f.offset, (40 - spr.fontHeight()) / 2);
+        spr.drawString(f.text, f.offset, y_center);
         spr.pushSprite(f.x, f.y);
       }
       xSemaphoreGive(tft_mutex);
 
       if (!any_active) {
         scroll_task_running = false;
-        spr.deleteSprite();
-        spr.unloadFont();
-        return;
+        break; 
       }
 
-      vTaskDelay(pdMS_TO_TICKS(16));  // ~60 FPS
+      vTaskDelay(pdMS_TO_TICKS(33)); // 30 fps
     }
+    spr.deleteSprite();
+    spr.unloadFont();
   }
 
   void handle_progress(float cur, float dur) {

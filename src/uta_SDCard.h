@@ -5,10 +5,10 @@
 
 #include "uta_Display.h"
 
-#define SPI_MISO 37
-#define SPI_MOSI 35
-#define SPI_SCK 36
-#define SPI_CS 39
+#define SPI_MISO 40
+#define SPI_MOSI 42
+#define SPI_SCK 41
+#define SPI_CS 2
 
 #define SD_FAT_TYPE 2
 #define SPI_CLOCK SD_SCK_MHZ(79)
