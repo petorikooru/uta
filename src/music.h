@@ -1,0 +1,122 @@
+// const char *ROOT = "/Music/Arcaea Sound Collection/";
+// const String DIRECTORIES[] = {
+//     "/Music/Arcaea Sound Collection/[IROCD-001] Arcaea Sound Collection -Memories of Light- [M3-44]/",
+//     "/Music/Arcaea Sound Collection/[IROCD-002] Arcaea Sound Collection -Memories of Conflict- [M3-44]/",
+//     "/Music/Arcaea Sound Collection/[IROCD-003] Arcaea Sound Collection -Memories of Realms- [M3-46]/",
+//     "/Music/Arcaea Sound Collection/[IROCD-004] Arcaea Sound Collection -Memories of Dreams-/",
+//     "/Music/Arcaea Sound Collection/[IROCD-005] Arcaea Sound Collection -Memories of Wrath-/",
+//     "/Music/Arcaea Sound Collection/[IROCD-006] Arcaea Sound Collection -Memories of Myth-/",
+//     "/Music/Arcaea Sound Collection/[IROCD-007] Arcaea Sound Collection -Memory of Serenity-/",
+// };
+
+const char* ROOT = "/Music/Aitsuki Nakuru/";
+const String DIRECTORIES[] = {
+  "/Music/Aitsuki Nakuru/[2023.01.13] 藍月なくる － 逆沙華 [WEB-FLAC]/",
+  "/Music/Aitsuki Nakuru/Fragile Utopia/",
+  "/Music/Aitsuki Nakuru/Nakuru Aitsuki 7th Album - Indigrotto (24bit)/",
+  "/Music/Aitsuki Nakuru/[M3-51] 藍月なくる - ミシュメリア {HFMM-02} [CD-FLAC]/",
+  "/Music/Aitsuki Nakuru/Lucid Hallucination/",
+  "/Music/Aitsuki Nakuru/Nacollection4/",
+  "/Music/Aitsuki Nakuru/[DVSP-0196] Feryquitous x 藍月なくる - IdenTism (M3-41)/",
+  "/Music/Aitsuki Nakuru/[2024.05.22] 藍月なくる×棗いつき 2ndコラボシングル「約束のリンカネーション」[FLAC 48kHz／24bit]/",
+  "/Music/Aitsuki Nakuru/Nacollection-3-/",
+  "/Music/Aitsuki Nakuru/藍月なくる - ご注文はえいえんに/",
+  "/Music/Aitsuki Nakuru/2023.10.18 [GECL-00001] 藍月なくる×棗いつき — 追想のラグナロク【藍月なくる盤】/",
+  "/Music/Aitsuki Nakuru/[2024.12.18] 藍月なくる 1stシングル「何も知らないまま。」[FLAC 48kHz／24bit]/",
+  "/Music/Aitsuki Nakuru/JelLaboratory/",
+  "/Music/Aitsuki Nakuru/[M3-38] Nakuru Aitsuki (藍月なくる) — アプルフィリアの秘め事 [FLAC]/",
+  "/Music/Aitsuki Nakuru/Eufolie/",
+  "/Music/Aitsuki Nakuru/[2021-01-26] Feryquitous feat. 藍月なくる - Evil Bubble [FLAC]/",
+  "/Music/Aitsuki Nakuru/(M3-40) 藍月なくる x Sennzai - soleil de minuit [FLAC]/",
+  "/Music/Aitsuki Nakuru/[M3-47] 藍月なくる - Transpain {NRCD-06} [CD-FLAC]/",
+  "/Music/Aitsuki Nakuru/藍月なくる - Counterfeit [FLAC]/",
+  "/Music/Aitsuki Nakuru/[2023.10.18]藍月なくる & 棗いつき ／ 追想のラグナロク [棗いつき盤][CD-FLAC]/",
+  "/Music/Aitsuki Nakuru/{NACV-0001} クラリムステラ - 藍月なくる Cover Collection vol.1 [CD-FLAC]/",
+  "/Music/Aitsuki Nakuru/藍月なくる - Dear The Night I Loved/",
+  "/Music/Aitsuki Nakuru/藍月なくる x まめこ - Baby Romantica [CD FLAC]/",
+  "/Music/Aitsuki Nakuru/(C95) 諸富智紗姫 starring 藍月なくる - STARRY ARTET HELLO WORLD 05 CHISAKI MORODOMI {PROJECT ARTET, CCSA-0005} [CD-FLAC]/",
+  "/Music/Aitsuki Nakuru/Singles/",
+  "/Music/Aitsuki Nakuru/Nacollection!/",
+  "/Music/Aitsuki Nakuru/[M3-55] 藍月なくる - わたしとキミの幸せな終末 {NRCD-09} [CD-FLAC]/",
+};
+
+// const char *ROOT = "/Music/Feryquitous/";
+// const String DIRECTORIES[] = {
+//   "/Music/Feryquitous/[DVSP-0191] Feryquitous - Irui (C93)/",
+//   "/Music/Feryquitous/[DVSP-0170] Saqriphrx (C91)/",
+//   "/Music/Feryquitous/[DVSP-0177] Inside of monochrome (COMITIA 120)/",
+//   "/Music/Feryquitous/[DVSP-0143] ZheleNaught (C89)/",
+//   "/Music/Feryquitous/Oxydlate [FLAC]/",
+//   "/Music/Feryquitous/Sta, Feryquitous - 2 Minutes Euphoria -2分間の多幸感-/",
+//   "/Music/Feryquitous/Feryquitous — Arcahv {no cat#} [24bit WEB-FLAC]/",
+//   "/Music/Feryquitous/Feryquitous - Monodrate/",
+//   "/Music/Feryquitous/[C97] Diverse System (Feryquitous) — 白戒 {Diverse System - DVSP-0232} [CD-FLAC]/",
+//   "/Music/Feryquitous/Feryquitous - Diverse Focus Feryquitous (2020) [FLAC]/",
+//   "/Music/Feryquitous/eclosion/",
+//   "/Music/Feryquitous/twilight/",
+//   "/Music/Feryquitous/Lethal/",
+//   "/Music/Feryquitous/Ideal/",
+//   "/Music/Feryquitous/Feryquitous - M/",
+//   "/Music/Feryquitous/Feryquitous - C/",
+//   "/Music/Feryquitous/Feryquitous - Eltina/",
+//   "/Music/Feryquitous/Arghena/",
+//   "/Music/Feryquitous/Feryquitous - Xrv/",
+//   "/Music/Feryquitous/Dstorv/",
+//   "/Music/Feryquitous/[2024] Feryquitous — Y {TYPE-003} [24bit WEB]/",
+// };
+
+// const char *ROOT = "/Music/Camellia (2010-2021)/1. Albums/";
+// const String DIRECTORIES[] = {
+//       "/Music/Camellia (2010-2021)/1. Albums/28. Camellia - Tera I-O (2020)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/10. Camellia - dreamless wanderer (2014)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/05. Camellia - Stance on Wave (2013)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/06. Camellia - paroxysm (2013)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/23. Camellia - heart of android (2018)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/25. Camellia & Nanahira - GOIN'! (2019)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/01. Camellia - ハニージンジャーエール (2010)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/27. Camellia - Dweller's Empty Path (Original Sound Track)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/08. Camellia & Nanahira - Versus! (2014)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/26. Camellia - Xroniàl Xéro (2020)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/09. Camellia - sudden shower (2014)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/13. Camellia - crystallized (2015)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/03. Camellia - mikUbiquity (2011)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/22. Camellia - Camellia “Remixes“ Summary & VIPs 02 (2018)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/02. Camellia - TRIPPERS (2011)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/29. Camellia - U.U.F.O (2021)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/07. Camellia - [diffraction] (2014)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/19. Camellia - INVAIDAS FROM DA JUNGLE (2017)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/14. Camellia - INSANE INFLAME (2016)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/21. Camellia - GALAXY BURST (2018)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/11. Camellia - PLANET SHAPER (2015)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/12. Camellia & Nanahira - Replay! (2015)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/20. Camellia & Nanahira - 4orce! (2017)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/17. Camellia Vs Akira Complex - Reality Distortion (2016)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/16. Camellia & Nanahira - Sleep! (2016)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/18. Camellia - Camellia's Guest Summary (2017)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/04. Camellia - Michno-Sequence (2012)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/24. Camellia - Blackmagik Blazing (2019)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/15. Camellia - MEGANTO METEOR (2016)/",
+//       "/Music/Camellia (2010-2021)/1. Albums/かめるかめりあ - REX/",
+//       "/Music/Camellia (2010-2021)/1. Albums/(Camellia) 2023.02.15 [BRCA-00138] 灰の羽搏 /",
+//       "/Music/Camellia (2010-2021)/1. Albums/[C106] かめりあ — Chimera Dragons {CTCD-0024} [WEB-FLAC]/",
+// };
+
+// const char *ROOT = "/Music/xi";
+// const String DIRECTORIES[] = {
+//   "/Music/xi/World Fragments/",
+//   "/Music/xi/Evolved Chronicles/",
+//   "/Music/xi/Storm and Impulse/",
+//   "/Music/xi/Quietus Ray/",
+//   "/Music/xi/Agartha/",
+//   "/Music/xi/Parousia/",
+// };
+
+// const char *ROOT = "/Music/TUYU";
+// const String DIRECTORIES[] = {
+//   "/Music/TUYU/[N4O] [2023.06.21] TUYU - Under Mentality [FLAC]",
+//   "/Music/xi/Evolved Chronicles/",
+//   "/Music/xi/Storm and Impulse/",
+//   "/Music/xi/Quietus Ray/",
+//   "/Music/xi/Agartha/",
+//   "/Music/xi/Parousia/",
+// };
